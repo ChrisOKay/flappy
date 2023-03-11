@@ -1,4 +1,5 @@
 #![warn(clippy::all, clippy::pedantic)]
+#![allow(clippy::cast_possible_truncation)]
 use bracket_lib::prelude::*;
 
 enum GameMode {
@@ -13,12 +14,12 @@ const FRAME_DURATION: f32 = 25.0;
 
 struct Player {
     x: i32,
-    y: i32,
+    y: f32,
     velocity: f32,
 }
 
 impl Player {
-    fn new(x: i32, y: i32) -> Self {
+    fn new(x: i32, y: f32) -> Self {
         Player {
             x,
             y,
@@ -26,16 +27,24 @@ impl Player {
         }
     }
     fn render(&mut self, ctx: &mut BTerm) {
-        ctx.set(0, self.y, YELLOW, BLACK, to_cp437('@'));
+        ctx.set_fancy(
+            PointF::new(0.0, self.y),
+            0,
+            Radians::new(0.0),
+            PointF::new(1.0, 1.0),
+            YELLOW,
+            BLACK,
+            to_cp437('@'),
+        );
     }
     fn gravity_and_move(&mut self) {
         if self.velocity < 2.0 {
             self.velocity += 0.2;
         }
-        self.y += self.velocity as i32;
+        self.y += self.velocity;
         self.x += 1;
-        if self.y < 0 {
-            self.y = 0;
+        if self.y < 0.0 {
+            self.y = 0.0;
         }
     }
     fn flap(&mut self) {
@@ -66,14 +75,14 @@ impl Obstacle {
             ctx.set(screen_x, y, RED, BLACK, to_cp437('|'));
         }
         for y in self.gap_y + half_size..SCREEN_HEIGHT {
-            ctx.set(screen_x, y, RED, BLACK, to_cp437('|'))
+            ctx.set(screen_x, y, RED, BLACK, to_cp437('|'));
         }
     }
     fn hit_obstacle(&self, player: &Player) -> bool {
         let half_size = self.size / 2;
         let does_x_match = player.x == self.x;
-        let player_above_gap = player.y < self.gap_y - half_size;
-        let player_below_gap = player.y > self.gap_y + half_size;
+        let player_above_gap = player.y < (self.gap_y - half_size) as f32;
+        let player_below_gap = player.y > (self.gap_y + half_size) as f32;
         does_x_match && (player_above_gap || player_below_gap)
     }
 }
@@ -89,7 +98,7 @@ struct State {
 impl State {
     fn new() -> Self {
         State {
-            player: Player::new(5, 25),
+            player: Player::new(0, 0.5),
             frame_time: 0.0,
             obstacle: Obstacle::new(SCREEN_WIDTH, 0),
             mode: GameMode::Menu,
@@ -115,12 +124,12 @@ impl State {
             self.score += 1;
             self.obstacle = Obstacle::new(self.player.x + SCREEN_WIDTH, self.score);
         }
-        if self.player.y > SCREEN_HEIGHT || self.obstacle.hit_obstacle(&self.player) {
+        if self.player.y > SCREEN_HEIGHT as f32 || self.obstacle.hit_obstacle(&self.player) {
             self.mode = GameMode::End;
         }
     }
     fn restart(&mut self) {
-        self.player = Player::new(5, 25);
+        self.player = Player::new(0, 0.5);
         self.frame_time = 0.0;
         self.obstacle = Obstacle::new(SCREEN_WIDTH, 0);
         self.mode = GameMode::Playing;
@@ -168,6 +177,8 @@ impl GameState for State {
 fn main() -> BError {
     let context = BTermBuilder::simple80x50()
         .with_title("Flappy Dragon")
+        .with_fancy_console(80, 50, "terminal8x8.png")
+        .with_vsync(false)
         .build()?;
     main_loop(context, State::new())
 }
